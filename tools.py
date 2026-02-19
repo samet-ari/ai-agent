@@ -10,7 +10,8 @@ def read_file(path):
 
 def write_file(path, content):
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+        if os.path.dirname(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             f.write(content)
         return f"Fichier écrit : {path}"
@@ -29,37 +30,46 @@ def run_command(command):
 
 TOOLS = [
     {
-        "name": "read_file",
-        "description": "Lit le contenu d'un fichier",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Chemin du fichier"}
-            },
-            "required": ["path"]
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Lit le contenu d'un fichier",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Chemin du fichier"}
+                },
+                "required": ["path"]
+            }
         }
     },
     {
-        "name": "write_file",
-        "description": "Crée ou écrit dans un fichier",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Chemin du fichier"},
-                "content": {"type": "string", "description": "Contenu à écrire"}
-            },
-            "required": ["path", "content"]
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Crée ou écrit dans un fichier",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Chemin du fichier"},
+                    "content": {"type": "string", "description": "Contenu à écrire"}
+                },
+                "required": ["path", "content"]
+            }
         }
     },
     {
-        "name": "run_command",
-        "description": "Exécute une commande terminal",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "command": {"type": "string", "description": "Commande à exécuter"}
-            },
-            "required": ["command"]
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": "Exécute une commande terminal",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Commande à exécuter"}
+                },
+                "required": ["command"]
+            }
         }
     }
 ]

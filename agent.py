@@ -1,83 +1,66 @@
-import anthropic
+from groq import Groq
 import os
-import sys
+import json
 from rich.console import Console
 from rich.panel import Panel
 from tools import read_file, write_file, run_command, TOOLS
 
 console = Console()
+model = "llama-3.3-70b-versatile"
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-PREMIUM_MODEL = "claude-opus-4-5"
-MINI_MODEL = "claude-haiku-4-5"
-
-use_premium = "--premium" in sys.argv
-model = PREMIUM_MODEL if use_premium else MINI_MODEL
-
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-
-SYSTEM_PROMPT = """Tu es un agent CLI IA. Tu aides l'utilisateur en utilisant 
-des outils pour lire, écrire des fichiers et exécuter des commandes terminal.
-Explique brièvement ce que tu fais à chaque étape. Réponds en français."""
+SYSTEM_PROMPT = "Tu es un agent CLI IA. Tu aides l'utilisateur avec des outils pour lire, ecrire des fichiers et executer des commandes. Reponds en francais."
 
 def run_tool(name, inputs):
-    console.print(f"[yellow]⚙ Outil : {name}[/yellow]")
+    console.print(f"[yellow]Outil : {name}[/yellow]")
     if name == "read_file":
         return read_file(inputs["path"])
     elif name == "write_file":
         return write_file(inputs["path"], inputs["content"])
     elif name == "run_command":
         cmd = inputs["command"]
-        console.print(f"[red]⚠ Commande à exécuter : {cmd}[/red]")
+        console.print(f"[red]Commande : {cmd}[/red]")
         confirm = input("Confirmer ? (o/n) : ")
         if confirm.lower() != "o":
-            return "Commande refusée par l'utilisateur."
+            return "Commande refusee."
         return run_command(cmd)
     return "Outil inconnu"
 
 def chat(user_message, history):
     history.append({"role": "user", "content": user_message})
-
     while True:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=model,
             max_tokens=4096,
-            system=SYSTEM_PROMPT,
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + history,
             tools=TOOLS,
-            messages=history
+            tool_choice="auto"
         )
-
-        history.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            for block in response.content:
-                if hasattr(block, "text"):
-                    console.print(Panel(block.text, title="[green]Agent[/green]", border_style="green"))
-            break
-
-        elif response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = run_tool(block.name, block.input)
-                    console.print(f"[dim]→ {result[:300]}[/dim]")
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result
-                    })
-            history.append({"role": "user", "content": tool_results})
+        message = response.choices[0].message
+        if message.tool_calls:
+            history.append({
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in message.tool_calls]
+            })
+            for tc in message.tool_calls:
+                try:
+                    inputs = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    console.print("[red]Erreur parsing.[/red]")
+                    continue
+                result = run_tool(tc.function.name, inputs)
+                console.print(f"[dim]-> {result[:300]}[/dim]")
+                history.append({"role": "tool", "tool_call_id": tc.id, "content": result})
         else:
+            history.append({"role": "assistant", "content": message.content or ""})
+            if message.content:
+                console.print(Panel(message.content, title="[green]Agent[/green]", border_style="green"))
             break
-
     return history
 
 def main():
-    model_label = f"[magenta]{PREMIUM_MODEL}[/magenta]" if use_premium else f"[cyan]{MINI_MODEL}[/cyan]"
-    console.print(Panel(
-        f"[bold]Agent CLI IA[/bold]\nModèle : {model_label}\nTaper 'exit' pour quitter",
-        border_style="cyan"
-    ))
-
+    console.print(Panel(f"[bold]Agent CLI IA[/bold]\nModele : {model}\nTaper 'exit' pour quitter", border_style="cyan"))
     history = []
     while True:
         try:
