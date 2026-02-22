@@ -4,8 +4,6 @@
 
 ### Agent CLI IA - J04
 
-**Date :** 2026-02-19
-
 **Modèle utilisé :** llama-3.3-70b-versatile (Groq)
 
 **Fonctionnalités implémentées :**
